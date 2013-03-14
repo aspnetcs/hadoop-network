@@ -11,8 +11,10 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 import com.tencent.bi.utils.hadoop.FileOperators;
@@ -30,27 +32,28 @@ public class FirstOrder {
 		job.setOutputKeyClass(LongWritable.class);
 		job.setOutputValueClass(LongWritable.class);
 		job.setMapperClass(CNTMapper.class);
-		job.setCombinerClass(CNTReducer.class);
-		job.setReducerClass(CNTReducer.class);
-		job.setInputFormatClass(TextInputFormat.class);
-		job.setOutputFormatClass(TextOutputFormat.class);
+		job.setNumReduceTasks(0);
+		//job.setCombinerClass(CNTReducer.class);
+		//job.setReducerClass(CNTReducer.class);
+		job.setInputFormatClass(SequenceFileInputFormat.class);
+		job.setOutputFormatClass(SequenceFileOutputFormat.class);
 		FileInputFormat.addInputPath(job, new Path(inputPath));
 		FileOutputFormat.setOutputPath(job, new Path(conf.get("hadoop.tmp.path")+"NumOfEdges/"));
 		job.waitForCompletion(true);
 	}
 
-	public static class CNTMapper extends Mapper<LongWritable, Text, LongWritable, LongWritable>{
+	public static class CNTMapper extends Mapper<LongWritable, LongWritable, LongWritable, LongWritable>{
 
 		LongWritable outKey = new LongWritable();
 		
 		LongWritable outValue = new LongWritable();
 		
 		@Override
-		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+		public void map(LongWritable key, LongWritable value, Context context) throws IOException, InterruptedException {
 			outKey.set(0);
 			outValue.set(1);
 			context.getCounter("Eval", "Cnt").increment(1);
-			context.write(outKey, outValue);
+			//context.write(outKey, outValue);
 		}
 	}
 	
@@ -105,7 +108,7 @@ public class FirstOrder {
 		job.setInputFormatClass(TextInputFormat.class);
 		job.setOutputFormatClass(TextOutputFormat.class);
 		FileInputFormat.addInputPath(job, new Path(conf.get("hadoop.tmp.path")+"UserCount/"));
-		FileOutputFormat.setOutputPath(job, new Path(conf.get("hadoop.tmp.path")+"FollowDistribution-"+idx+"/"));
+		FileOutputFormat.setOutputPath(job, new Path(conf.get("hadoop.output.path")+"FollowDistribution-"+idx+"/"));
 		job.waitForCompletion(true);
 		FileSystem fs = FileSystem.get(conf); 
 		fs.delete(new Path(conf.get("hadoop.tmp.path")+"UserCount/"), true);

@@ -13,9 +13,9 @@ import cern.colt.matrix.impl.DenseDoubleMatrix1D;
 //import cern.colt.matrix.impl.SparseDoubleMatrix1D;
 
 /**
- * Writable Class for Matrix Row
+ * {@link Writable} Class for Matrix Row
  * @author tigerzhong
- *
+ * @weixue Will it be better to implement as a wrapper of {@link cern.colt.matrix.DoubleMatrix1D}?
  */
 public class MatrixRowWritable implements Writable {
 	/**
@@ -24,6 +24,7 @@ public class MatrixRowWritable implements Writable {
 	private long[] rowIDs;
 	/**
 	 * Values of non-zero elements
+	 * @weixue should be renamed to "vector".
 	 */
 	private double[] vectors;
 	/**

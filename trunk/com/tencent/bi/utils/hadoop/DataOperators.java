@@ -14,28 +14,29 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 /**
- * Data operators
+ * This class provides static methods for read/write structured data from/to files on HDFS.
  * @author tigerzhong
- *
+ * 
  */
 public class DataOperators {
 	
 	/**
-	 * Read text from HDFS line by line
+	 * Read the content of specified file(s) on HDFS as lines of text.
+	 * @see FileSystem#globStatus(Path)
 	 * @param conf, configuration
-	 * @param pathName, path of data
-	 * @return data in list
+	 * @param pathName, pathname prefix of data file(s), not recursively processed.
+	 * @return data lines of text as a list of String.
 	 * @throws IOException
 	 */
 	public static List<String> readTextFromHDFS(Configuration conf, String pathName) throws IOException{
 		List<String> resList = new ArrayList<String>();
 		FileSystem fs = FileSystem.get(conf); 
-		FileStatus fsta[] = fs.globStatus(new Path(pathName+"*"));
+		FileStatus fsta[] = fs.globStatus(new Path(pathName+"*"));	//get all path
 		for (FileStatus it : fsta) {
 			Path singlePath = it.getPath();
-			if(it.isDir()) continue;
+			if(it.isDir()) continue;	//skip the director
 			BufferedReader in = new BufferedReader(new InputStreamReader(fs.open(singlePath)));
-			while(in.ready())
+			while(in.ready())			//read all
 				resList.add(in.readLine());
 			in.close();
 		}

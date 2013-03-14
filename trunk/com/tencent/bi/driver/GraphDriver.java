@@ -42,8 +42,10 @@ public class GraphDriver {
 	
 	private static int numValues = 1;
 	
+	@SuppressWarnings("unused")
 	private static long startNode = -1;
 	
+	@SuppressWarnings("unused")
 	private static long endNode = -1;
 	
 	/**
@@ -174,7 +176,7 @@ public class GraphDriver {
 				} else if (modelName.indexOf("search")>-1){	//Search
 					//Reachable model = (Reachable) Class.forName(modelName).newInstance();
 					BFSPair model = new BFSPair();
-					model.initModel(numNodes, numIt, startNode, endNode, inputPath, outputPath);
+					model.initModel(numIt, inputPath);
 					model.performSearch();
 				} else if(modelName.indexOf("ADListGenerator")>-1){	//utility
 					ADListGenerator.generateADList(numNodes, 1, inputPath, outputPath);
@@ -182,7 +184,8 @@ public class GraphDriver {
 					if(line.hasOption("ad")) ImportanceGenerator.generateValueList(numValues, numNodes, true, inputPath, outputPath);
 					else ImportanceGenerator.generateValueList(numValues, numNodes, false, inputPath, outputPath);
 				} else if(modelName.indexOf("NumberLinksGenerator")>-1) {
-					NumberLinksGenerator.getNumLinks(inputPath, outputPath);
+					if(line.hasOption("ad")) NumberLinksGenerator.getNumLinks(inputPath, outputPath, true);
+					else NumberLinksGenerator.getNumLinks(inputPath, outputPath, false);
 				} else if(modelName.indexOf("FirstOrder")>-1){
 					if (!line.hasOption("F")) {
 						HelpFormatter formatter = new HelpFormatter();
