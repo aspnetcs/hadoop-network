@@ -1,13 +1,12 @@
 package com.tencent.bi.graph.model.search;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
@@ -16,6 +15,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -23,7 +23,6 @@ import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
-import com.tencent.bi.utils.hadoop.DataOperators;
 import com.tencent.bi.utils.hadoop.FileOperators;
 import com.tencent.bi.utils.serialization.LongPairWritable;
 
@@ -34,10 +33,6 @@ import com.tencent.bi.utils.serialization.LongPairWritable;
  */
 public class BFSPair {
 	/**
-	 * Number of nodes
-	 */
-	protected int numNode = 0;
-	/**
 	 * Number of iterations
 	 */
 	protected int numIt = 100;
@@ -45,22 +40,10 @@ public class BFSPair {
 	 * Input path
 	 */
 	protected String inputPath = "";
-	/**
-	 * Output path
-	 */
-	protected String outputPath = "";
 	
-	protected long targetID = 0;
-	
-	protected long startID = 0;
-	
-	public void initModel(int numNode, int numIt, long na, long nb, String inputPath, String outputPath){
-		this.numNode = numNode;
+	public void initModel(int numIt, String inputPath){
 		this.numIt = numIt;
 		this.inputPath = inputPath;
-		this.outputPath = outputPath;
-		this.targetID = nb;
-		this.startID = na;
 	}
 	
 	/**
@@ -70,14 +53,15 @@ public class BFSPair {
 	public void performSearch() throws Exception{
 		for(int it=0;it<numIt;it++){
 			Configuration conf = FileOperators.getConfiguration();
+			conf.set("pair.path", inputPath);
 			//First MR, flooding
 			Job job = new Job(conf);
 			job.setJarByClass(BFSPair.class);
 			job.setJobName("BFS-It-"+it);	
 			job.setMapOutputKeyClass(LongPairWritable.class);
 			job.setMapOutputValueClass(LongWritable.class);
-			job.setOutputKeyClass(LongPairWritable.class);
-			job.setOutputValueClass(LongWritable.class);
+			job.setOutputKeyClass(LongWritable.class);
+			job.setOutputValueClass(NullWritable.class);
 			job.setPartitionerClass(FirstPartitioner.class);
 			job.setSortComparatorClass(KeyComparator.class);
 			job.setGroupingComparatorClass(GroupComparator.class);
@@ -90,26 +74,25 @@ public class BFSPair {
 			FileOutputFormat.setOutputPath(job, new Path(conf.get("hadoop.tmp.path")+"BFSPair/"));
 			job.waitForCompletion(true);
 			//Second MR, picking the max value
-			conf.setLong("model.target", targetID);
+			conf.set("mapred.textoutputformat.separator", ",");
 			job = new Job(conf);
 			job.setJarByClass(BFSPair.class);
 			job.setJobName("BFS-It-"+it);	
-			job.setMapOutputKeyClass(LongPairWritable.class);
-			job.setMapOutputValueClass(LongWritable.class);
+			job.setMapOutputKeyClass(LongWritable.class);
+			job.setMapOutputValueClass(NullWritable.class);
 			job.setOutputKeyClass(LongWritable.class);
-			job.setOutputValueClass(LongWritable.class);
+			job.setOutputValueClass(NullWritable.class);
 			job.setMapperClass(Mapper.class);
+			job.setCombinerClass(SelectionReducer.class);
 			job.setReducerClass(SelectionReducer.class);
 			job.setInputFormatClass(SequenceFileInputFormat.class);
 			job.setOutputFormatClass(TextOutputFormat.class);
-			FileInputFormat.addInputPath(job, new Path(inputPath));
 			FileInputFormat.addInputPath(job, new Path(conf.get("hadoop.tmp.path")+"BFSPair/"));	//Distance
 			FileOutputFormat.setOutputPath(job, new Path(conf.get("hadoop.cache.path")+"BFSPair/"+(it+1)+"/"));
 			job.waitForCompletion(true);
 			//Postprocess
 			FileSystem fs = FileSystem.get(conf); 
 			fs.delete(new Path(conf.get("hadoop.tmp.path")+"BFSPair/"), true);
-			if(fs.exists(new Path(conf.get("hadoop.tmp.path")+"Reachable.finished"))) break;
 		}
 	}
 	
@@ -119,18 +102,26 @@ public class BFSPair {
 		
 		private LongWritable outValue = new LongWritable();
 		
+		private String pairPath = "";
+		
 		@Override
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-			String[] items = value.toString().split(",");
-			if(items.length==1){ //relation
-				String[] pair = items[0].split("\t");
-				outKey.set(Long.parseLong(pair[0]), 1);
-				outValue.set(Long.parseLong(pair[1]));
-			} else { 			 //interaction
-				outKey.set(Long.parseLong(items[0]), 0);
-				outValue.set(Long.parseLong(items[1]));
+			String path = ((FileSplit) context.getInputSplit()).getPath().toString();
+			if(path.indexOf(pairPath)>-1){ //relation
+				String[] pair = value.toString().split("\t");
+				outKey.set(Long.parseLong(pair[1]), 1);
+				outValue.set(Long.parseLong(pair[0]));
+			} else { 			 		   //interaction
+				outKey.set(Long.parseLong(value.toString()), 0);
+				outValue.set(0);
 			}
 			context.write(outKey, outValue);
+		}
+		
+		@Override
+		protected void setup(Context context) throws IOException, InterruptedException{
+			super.setup(context);
+			pairPath = context.getConfiguration().get("pair.path");
 		}
 	}
 	
@@ -139,36 +130,28 @@ public class BFSPair {
 	 * @author tigerzhong
 	 *
 	 */
-	public static class BFSReducer extends Reducer<LongPairWritable, LongWritable, LongWritable, LongWritable>{
+	public static class BFSReducer extends Reducer<LongPairWritable, LongWritable, LongWritable, NullWritable>{
 		/**
 		 * Output key 
 		 */
 		private LongWritable outKey = new LongWritable();
-		/**
-		 * Output value
-		 */
-		private LongWritable outValue = new LongWritable();
 			
 		@Override
 		public void reduce(LongPairWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
 			boolean hasValue = false;	//the current node is reachable?
-			long dist = 0;				//the distance from the start node to the current node
 			for(LongWritable value : values){
-				if(key.getSecond()==0){ 	//distance
+				if(key.getSecond()==0){ 	//list
 					hasValue = true;
-					dist = value.get();
+					outKey.set(key.getFirst());
+					context.write(outKey, NullWritable.get());
 				} else {					//pair
-					if(hasValue){	//flooding
+					if(hasValue){			//flooding
 						long id = value.get();
 						outKey.set(id);
-						outValue.set(dist+1);
-						context.write(outKey, outValue);
-					}
+						context.write(outKey, NullWritable.get());
+					} else break;
 				}
 			}
-			outKey.set(key.getFirst());
-			outValue.set(dist);
-			context.write(outKey, outValue);
 		}
 	}
 	
@@ -218,34 +201,12 @@ public class BFSPair {
 	 * @author tigerzhong
 	 *
 	 */
-	public static class SelectionReducer extends Reducer<LongWritable, LongWritable, LongWritable, LongWritable>{
-		/**
-		 * Output value
-		 */
-		private LongWritable outValue = new LongWritable();
-		
-		private long nb = 0;
-		
+	public static class SelectionReducer extends Reducer<LongWritable, NullWritable, LongWritable, NullWritable>{
+
 		@Override
-		public void reduce(LongWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
-			long dist = Long.MAX_VALUE;
-			for(LongWritable value : values){		//get the shortest distance
-				long currentDist = value.get();
-				dist = Math.min(dist, currentDist);
-			}
-			outValue.set(dist);
-			context.write(key, outValue);
-			if(nb == key.get()){
-				List<String> res = new ArrayList<String>();
-				res.add(nb+","+dist);
-				DataOperators.saveTextToHDFS(context.getConfiguration(), context.getConfiguration().get("hadoop.tmp.path")+"Reachable.finished", res, true);
-			}
+		public void reduce(LongWritable key, Iterable<NullWritable> values, Context context) throws IOException, InterruptedException {
+			context.write(key, NullWritable.get());
 		}
-		
-		@Override
-		protected void setup(Context context) throws IOException, InterruptedException{
-			super.setup(context);
-			nb = context.getConfiguration().getLong("model.target",0);
-		}
+
 	}
 }

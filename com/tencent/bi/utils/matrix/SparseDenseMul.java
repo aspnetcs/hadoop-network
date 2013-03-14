@@ -24,6 +24,11 @@ import com.tencent.bi.utils.StringUtils;
 import com.tencent.bi.utils.hadoop.FileOperators;
 import com.tencent.bi.utils.serialization.MatrixRowWritable;
 
+/**
+ * Class for multiplication between one sparse and dense matrix
+ * @author tigerzhong
+ *
+ */
 public class SparseDenseMul implements MatrixOperator{
 		
 	@Override

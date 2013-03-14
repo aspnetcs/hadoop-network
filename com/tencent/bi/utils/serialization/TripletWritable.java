@@ -6,42 +6,53 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.*;
 
+/**
+ * Serialization object for triplet
+ * @author tigerzhong
+ *
+ */
 public class TripletWritable implements Writable {
 
-	protected int p;
+	protected long p;
 	
-	protected int q;
+	protected double s;
 	
 	protected double r;
 	
 	@Override
 	public void readFields(DataInput in) throws IOException {
-		p = in.readInt();
-		q = in.readInt();
+		p = in.readLong();
+		s = in.readDouble();
 		r = in.readDouble();
 	}
 
 	@Override
 	public void write(DataOutput out) throws IOException {
-		out.writeInt(p);
-		out.writeInt(q);
+		out.writeLong(p);
+		out.writeDouble(s);
 		out.writeDouble(r);
 	}
 
-	public int getP() {
+	public void set(long p, double s, double r){
+		this.p = p;
+		this.s = s;
+		this.r = r;
+	}
+	
+	public long getP() {
 		return p;
 	}
 
-	public void setP(int p) {
+	public void setP(long p) {
 		this.p = p;
 	}
 
-	public int getQ() {
-		return q;
+	public double getS() {
+		return s;
 	}
 
-	public void setQ(int q) {
-		this.q = q;
+	public void setS(double s) {
+		this.s = s;
 	}
 
 	public double getR() {
@@ -52,4 +63,8 @@ public class TripletWritable implements Writable {
 		this.r = r;
 	}
 
+	@Override
+	public String toString(){
+		return this.p+","+this.s+","+this.r;
+	}
 }

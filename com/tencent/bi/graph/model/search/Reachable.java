@@ -40,7 +40,7 @@ public class Reachable extends BFS{
 		MatrixRowWritable value = new MatrixRowWritable();
 		value.set(0.0);
 		Configuration conf = FileOperators.getConfiguration();
-		MatrixIO.writeMatrix(conf.get("hadoop.cache.path")+"DistBFS/0/", new LongWritable(idA), value);
+		MatrixIO.writeMatrixRow(conf.get("hadoop.cache.path")+"DistBFS/0/", new LongWritable(idA), value);
 		this.endID = idB;
 		performSearch();
 		return this.dist;
